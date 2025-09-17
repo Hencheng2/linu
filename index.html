@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberTerminal - Linux Command Web Tool</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252525;
+            --accent-primary: #bb86fc;
+            --accent-secondary: #03dac6;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+            --danger: #cf6679;
+            --success: #03dac6;
+            --warning: #ffb347;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Fira Code', 'Courier New', monospace;
+        }
+        
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--bg-tertiary);
+        }
+        
+        h1 {
+            color: var(--accent-primary);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        h2 {
+            color: var(--accent-secondary);
+            margin: 20px 0 15px;
+            font-size: 1.5rem;
+        }
+        
+        h3 {
+            color: var(--accent-primary);
+            margin: 15px 0 10px;
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background-color: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+        
+        .terminal {
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        
+        .terminal-output {
+            white-space: pre-wrap;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        
+        .command-line {
+            display: flex;
+            align-items: center;
+        }
+        
+        .prompt {
+            color: var(--success);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        #command-input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            padding: 5px;
+            outline: none;
+            font-family: 'Fira Code', monospace;
+        }
+        
+        .btn {
+            background-color: var(--accent-primary);
+            color: var(--bg-primary);
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: var(--accent-secondary);
+        }
+        
+        .tool-list {
+            list-style-type: none;
+        }
+        
+        .tool-item {
+            background-color: var(--bg-tertiary);
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        
+        .tool-item:hover {
+            background-color: #2e2e2e;
+            transform: translateX(5px);
+        }
+        
+        .tool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .tool-name {
+            font-weight: bold;
+            color: var(--accent-primary);
+        }
+        
+        .tool-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        
+        .tool-details {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+        }
+        
+        .tool-item.active .tool-details {
+            display: block;
+        }
+        
+        .tool-command {
+            background-color: var(--bg-primary);
+            padding: 8px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            color: var(--success);
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        
+        .info-tag {
+            background-color: var(--accent-secondary);
+            color: var(--bg-primary);
+        }
+        
+        .warning-tag {
+            background-color: var(--warning);
+            color: var(--bg-primary);
+        }
+        
+        .danger-tag {
+            background-color: var(--danger);
+            color: var(--bg-primary);
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--bg-tertiary);
+        }
+        
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        .command-history {
+            margin-top: 15px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: 5px;
+            border-bottom: 1px solid var(--bg-tertiary);
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .history-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CyberTerminal</h1>
+            <p class="subtitle">A modern web-based Linux command interface with security tools</p>
+        </header>
+        
+        <div class="grid">
+            <div>
+                <div class="card">
+                    <h2>Terminal</h2>
+                    <div class="terminal">
+                        <div class="terminal-output" id="output">
+                            <span class="prompt">user@cyberterminal:~$</span> Welcome to CyberTerminal!<br>
+                            <span class="prompt">user@cyberterminal:~$</span> Type your commands below or select a tool from the right.<br><br>
+                        </div>
+                        <div class="command-line">
+                            <span class="prompt">user@cyberterminal:~$</span>
+                            <input type="text" id="command-input" autofocus>
+                            <button class="btn" id="run-command">Run</button>
+                        </div>
+                    </div>
+                    
+                    <div class="command-history" id="command-history">
+                        <h3>Command History</h3>
+                        <div id="history-list"></div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>Common Linux Commands</h2>
+                    <ul class="tool-list">
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">ls - List directory contents</span>
+                                <span class="tag info-tag">FILE OPERATION</span>
+                            </div>
+                            <div class="tool-description">List information about files and directories</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> ls [options] [file|dir]</p>
+                                <p class="tool-command">ls -la /home/user</p>
+                                <p><strong>Common options:</strong><br>
+                                -l: use a long listing format<br>
+                                -a: show all files including hidden<br>
+                                -h: human-readable file sizes</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">grep - Search text</span>
+                                <span class="tag info-tag">TEXT PROCESSING</span>
+                            </div>
+                            <div class="tool-description">Search for patterns in files or input</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> grep [options] pattern [file...]</p>
+                                <p class="tool-command">grep -r "password" /var/www/</p>
+                                <p><strong>Common options:</strong><br>
+                                -r: recursive search<br>
+                                -i: case-insensitive search<br>
+                                -v: invert match (show non-matching lines)</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">chmod - Change file mode</span>
+                                <span class="tag warning-tag">PERMISSIONS</span>
+                            </div>
+                            <div class="tool-description">Change file permissions</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> chmod [options] mode file</p>
+                                <p class="tool-command">chmod 755 script.sh</p>
+                                <p><strong>Common options:</strong><br>
+                                -R: recursive change<br>
+                                -v: verbose output</p>
+                                <p><strong>Permission values:</strong><br>
+                                7: read, write, execute (rwx)<br>
+                                6: read, write (rw-)<br>
+                                5: read, execute (r-x)<br>
+                                4: read only (r--)</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div>
+                <div class="card">
+                    <h2>Security & Penetration Testing Tools</h2>
+                    <ul class="tool-list" id="tools-list">
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">nmap - Network Mapper</span>
+                                <span class="tag danger-tag">NETWORK SCANNING</span>
+                            </div>
+                            <div class="tool-description">Network discovery and security auditing tool</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> nmap [scan type] [options] target</p>
+                                <p class="tool-command">nmap -sS -sV -O -T4 192.168.1.1/24</p>
+                                <p><strong>Common options:</strong><br>
+                                -sS: TCP SYN stealth scan<br>
+                                -sV: version detection<br>
+                                -O: OS detection<br>
+                                -A: aggressive scan (OS, version, script, traceroute)<br>
+                                -p: specify ports (e.g., -p 80,443 or -p 1-1000)</p>
+                                <p><strong>Example uses:</strong><br>
+                                • Discover live hosts on a network<br>
+                                • Identify open ports and services<br>
+                                • Detect operating systems and versions<br>
+                                • Find vulnerabilities with NSE scripts</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">Maltego - OSINT & Forensics</span>
+                                <span class="tag info-tag">DATA MINING</span>
+                            </div>
+                            <div class="tool-description">Interactive data mining tool for link analysis</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> GUI-based tool, not command-line only</p>
+                                <p class="tool-command">maltego</p>
+                                <p><strong>Key features:</strong><br>
+                                • Transformations to gather information from various sources<br>
+                                • Visualization of relationships between entities<br>
+                                • Extensive library of transforms for different data types</p>
+                                <p><strong>Example uses:</strong><br>
+                                • Domain name research and DNS records<br>
+                                • Social network relationships analysis<br>
+                                • Email address investigation<br>
+                                • Infrastructure mapping</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">recon-ng - Web Reconnaissance</span>
+                                <span class="tag info-tag">WEB RECON</span>
+                            </div>
+                            <div class="tool-description">Full-featured web reconnaissance framework</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> recon-ng</p>
+                                <p class="tool-command">recon-ng -w example_workspace</p>
+                                <p><strong>Key features:</strong><br>
+                                • Module-based structure for reconnaissance tasks<br>
+                                • Workspace organization for different projects<br>
+                                • Database for storing results<br>
+                                • API integration with various services</p>
+                                <p><strong>Example workflow:</strong><br>
+                                1. Create a workspace<br>
+                                2. Add domains or companies<br>
+                                3. Load and execute modules for specific recon tasks<br>
+                                4. Export results to reports</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">nikto - Web Vulnerability Scanner</span>
+                                <span class="tag danger-tag">WEB SCANNING</span>
+                            </div>
+                            <div class="tool-description">Comprehensive web server scanner</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> nikto [options] -h host</p>
+                                <p class="tool-command">nikto -h https://example.com -p 80,443 -C all</p>
+                                <p><strong>Common options:</strong><br>
+                                -h: target host<br>
+                                -p: target ports<br>
+                                -C: display output in CSV format<br>
+                                -T: tuning (e.g., 0-9 for scan intensity)<br>
+                                -o: output to file</p>
+                                <p><strong>Scans for:</strong><br>
+                                • Server misconfigurations<br>
+                                • Default files and programs<br>
+                                • Outdated server components<br>
+                                • Common vulnerabilities</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">metasploit - Penetration Testing</span>
+                                <span class="tag danger-tag">EXPLOITATION</span>
+                            </div>
+                            <div class="tool-description">Advanced penetration testing framework</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> msfconsole</p>
+                                <p class="tool-command">msfconsole -q</p>
+                                <p><strong>Key components:</strong><br>
+                                • Exploits: code that uses vulnerabilities<br>
+                                • Payloads: code that runs after exploitation<br>
+                                • Auxiliary modules: scanning, fuzzing, sniffing<br>
+                                • Post-exploitation modules</p>
+                                <p><strong>Basic workflow:</strong><br>
+                                1. use [exploit_path]<br>
+                                2. set payload [payload_name]<br>
+                                3. set RHOSTS [target]<br>
+                                4. set LHOST [attacker_ip]<br>
+                                5. exploit</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">sqlmap - SQL Injection Tool</span>
+                                <span class="tag danger-tag">SQL INJECTION</span>
+                            </div>
+                            <div class="tool-description">Automatic SQL injection and database takeover tool</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> sqlmap [options] -u url</p>
+                                <p class="tool-command">sqlmap -u "http://example.com/page.php?id=1" --dbs</p>
+                                <p><strong>Common options:</strong><br>
+                                -u: target URL<br>
+                                --dbs: enumerate databases<br>
+                                --tables: enumerate tables<br>
+                                --columns: enumerate columns<br>
+                                --dump: dump table contents<br>
+                                --os-shell: prompt for an interactive OS shell</p>
+                                <p><strong>Example uses:</strong><br>
+                                • Test and exploit SQL injection flaws<br>
+                                • Extract database structure and data<br>
+                                • Gain file system access<br>
+                                • Execute commands on the database server</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">John the Ripper - Password Cracker</span>
+                                <span class="tag danger-tag">PASSWORD CRACKING</span>
+                            </div>
+                            <div class="tool-description">Fast password cracker</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> john [options] password_file</p>
+                                <p class="tool-command">john --wordlist=/usr/share/wordlists/rockyou.txt hashes.txt</p>
+                                <p><strong>Common options:</strong><br>
+                                --wordlist: specify wordlist file<br>
+                                --format: specify hash format<br>
+                                --rules: enable word mangling rules<br>
+                                --show: show cracked passwords</p>
+                                <p><strong>Example uses:</strong><br>
+                                • Crack Linux /etc/shadow passwords<br>
+                                • Crack Windows LM/NTLM hashes<br>
+                                • Crack password-protected archives<br>
+                                • Crack WiFi WPA-PSK captures</p>
+                            </div>
+                        </li>
+                        <li class="tool-item">
+                            <div class="tool-header">
+                                <span class="tool-name">hashcat - Advanced Password Recovery</span>
+                                <span class="tag danger-tag">PASSWORD CRACKING</span>
+                            </div>
+                            <div class="tool-description">World's fastest password cracker</div>
+                            <div class="tool-details">
+                                <p><strong>Usage:</strong> hashcat [options] hash|hashfile [wordlist|mask|directory]</p>
+                                <p class="tool-command">hashcat -m 0 -a 0 hashes.txt /usr/share/wordlists/rockyou.txt</p>
+                                <p><strong>Common options:</strong><br>
+                                -m: hash type (0 for MD5, 1000 for NTLM)<br>
+                                -a: attack mode (0 straight, 3 brute-force)<br>
+                                -o: output file for recovered passwords<br>
+                                --force: ignore warnings</p>
+                                <p><strong>Advanced features:</strong><br>
+                                • GPU acceleration support<br>
+                                • Distributed cracking networks<br>
+                                • Rule-based attacks<br>
+                                • Brute-force and mask attacks</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>CyberTerminal - Web-based Linux Command Interface | For educational purposes only</p>
+            <p>Use these tools only on systems you own or have explicit permission to test</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const commandInput = document.getElementById('command-input');
+            const runButton = document.getElementById('run-command');
+            const outputElement = document.getElementById('output');
+            const historyList = document.getElementById('history-list');
+            const toolItems = document.querySelectorAll('.tool-item');
+            
+            let commandHistory = [];
+            
+            // Tool item click handler
+            toolItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    // Toggle active class
+                    const isActive = this.classList.contains('active');
+                    
+                    // Close all items
+                    toolItems.forEach(tool => tool.classList.remove('active'));
+                    
+                    // Open clicked item if it wasn't already active
+                    if (!isActive) {
+                        this.classList.add('active');
+                    }
+                });
+            });
+            
+            // Command execution function
+            function executeCommand(command) {
+                if (!command.trim()) return;
+                
+                // Add to history
+                commandHistory.push(command);
+                updateHistoryDisplay();
+                
+                // Display command in terminal
+                outputElement.innerHTML += `<span class="prompt">user@cyberterminal:~$</span> ${command}\n`;
+                
+                // Simulate command output based on input
+                let output = '';
+                
+                if (command.startsWith('ls')) {
+                    output = 'file1.txt\tfile2.txt\ndirectory1/\tdirectory2/';
+                } else if (command.startsWith('cd ')) {
+                    output = `Changed directory to ${command.substring(3)}`;
+                } else if (command.startsWith('pwd')) {
+                    output = '/home/user';
+                } else if (command.startsWith('whoami')) {
+                    output = 'user';
+                } else if (command.startsWith('nmap')) {
+                    output = 'Starting Nmap 7.80 ( https://nmap.org )\nNmap scan report for example.com (192.168.1.1)\nHost is up (0.045s latency).\nNot shown: 995 closed ports\nPORT     STATE SERVICE\n22/tcp   open  ssh\n80/tcp   open  http\n443/tcp  open  https\n3306/tcp open  mysql';
+                } else if (command.startsWith('sqlmap')) {
+                    output = '[*] starting @ null\n[null] [INFO] testing connection to the target URL\n[null] [INFO] testing if the target URL content is stable\n[null] [INFO] target URL content is stable';
+                } else {
+                    output = `Command '${command}' executed successfully.`;
+                }
+                
+                outputElement.innerHTML += `${output}\n`;
+                
+                // Scroll to bottom
+                outputElement.parentElement.scrollTop = outputElement.parentElement.scrollHeight;
+                
+                // Clear input
+                commandInput.value = '';
+            }
+            
+            // Update command history display
+            function updateHistoryDisplay() {
+                historyList.innerHTML = '';
+                // Show last 5 commands
+                const recentHistory = commandHistory.slice(-5);
+                
+                recentHistory.forEach(cmd => {
+                    const historyItem = document.createElement('div');
+                    historyItem.classList.add('history-item');
+                    historyItem.textContent = cmd;
+                    historyItem.addEventListener('click', () => {
+                        commandInput.value = cmd;
+                        commandInput.focus();
+                    });
+                    historyList.appendChild(historyItem);
+                });
+            }
+            
+            // Run button click event
+            runButton.addEventListener('click', () => {
+                executeCommand(commandInput.value);
+            });
+            
+            // Enter key event
+            commandInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    executeCommand(commandInput.value);
+                }
+            });
+            
+            // Focus on input when clicking anywhere in terminal
+            document.querySelector('.terminal').addEventListener('click', () => {
+                commandInput.focus();
+            });
+        });
+    </script>
+</body>
+</html>
