@@ -256,6 +256,22 @@
         .history-item:hover {
             background-color: var(--bg-tertiary);
         }
+        
+        .file-system {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            padding-left: 10px;
+            border-left: 2px solid var(--accent-primary);
+        }
+        
+        .dir {
+            color: var(--accent-secondary);
+        }
+        
+        .file {
+            color: var(--text-primary);
+        }
     </style>
 </head>
 <body>
@@ -272,7 +288,8 @@
                     <div class="terminal">
                         <div class="terminal-output" id="output">
                             <span class="prompt">user@cyberterminal:~$</span> Welcome to CyberTerminal!<br>
-                            <span class="prompt">user@cyberterminal:~$</span> Type your commands below or select a tool from the right.<br><br>
+                            <span class="prompt">user@cyberterminal:~$</span> Type your commands below or select a tool from the right.<br>
+                            <span class="prompt">user@cyberterminal:~$</span> This is a simulation - commands don't actually run on your system.<br><br>
                         </div>
                         <div class="command-line">
                             <span class="prompt">user@cyberterminal:~$</span>
@@ -539,6 +556,31 @@
             const toolItems = document.querySelectorAll('.tool-item');
             
             let commandHistory = [];
+            let currentDir = '/home/user';
+            let fileSystem = {
+                '/home/user': {
+                    'type': 'directory',
+                    'content': {
+                        'documents': {
+                            'type': 'directory',
+                            'content': {
+                                'notes.txt': {
+                                    'type': 'file',
+                                    'content': 'These are my important notes.'
+                                }
+                            }
+                        },
+                        'pictures': {
+                            'type': 'directory',
+                            'content': {}
+                        },
+                        'readme.txt': {
+                            'type': 'file',
+                            'content': 'Welcome to your home directory!'
+                        }
+                    }
+                }
+            };
             
             // Tool item click handler
             toolItems.forEach(item => {
@@ -565,25 +607,55 @@
                 updateHistoryDisplay();
                 
                 // Display command in terminal
-                outputElement.innerHTML += `<span class="prompt">user@cyberterminal:~$</span> ${command}\n`;
+                outputElement.innerHTML += `<span class="prompt">user@cyberterminal:${currentDir}$</span> ${command}\n`;
                 
-                // Simulate command output based on input
+                // Parse command
+                const parts = command.split(' ');
+                const cmd = parts[0];
+                const args = parts.slice(1);
+                
+                // Process command
                 let output = '';
-                
-                if (command.startsWith('ls')) {
-                    output = 'file1.txt\tfile2.txt\ndirectory1/\tdirectory2/';
-                } else if (command.startsWith('cd ')) {
-                    output = `Changed directory to ${command.substring(3)}`;
-                } else if (command.startsWith('pwd')) {
-                    output = '/home/user';
-                } else if (command.startsWith('whoami')) {
-                    output = 'user';
-                } else if (command.startsWith('nmap')) {
-                    output = 'Starting Nmap 7.80 ( https://nmap.org )\nNmap scan report for example.com (192.168.1.1)\nHost is up (0.045s latency).\nNot shown: 995 closed ports\nPORT     STATE SERVICE\n22/tcp   open  ssh\n80/tcp   open  http\n443/tcp  open  https\n3306/tcp open  mysql';
-                } else if (command.startsWith('sqlmap')) {
-                    output = '[*] starting @ null\n[null] [INFO] testing connection to the target URL\n[null] [INFO] testing if the target URL content is stable\n[null] [INFO] target URL content is stable';
-                } else {
-                    output = `Command '${command}' executed successfully.`;
+                switch(cmd) {
+                    case 'ls':
+                        output = listFiles(args);
+                        break;
+                    case 'cd':
+                        output = changeDirectory(args);
+                        break;
+                    case 'pwd':
+                        output = currentDir;
+                        break;
+                    case 'mkdir':
+                        output = makeDirectory(args);
+                        break;
+                    case 'touch':
+                        output = createFile(args);
+                        break;
+                    case 'cat':
+                        output = readFile(args);
+                        break;
+                    case 'rm':
+                        output = removeFile(args);
+                        break;
+                    case 'whoami':
+                        output = 'user';
+                        break;
+                    case 'nmap':
+                        output = 'Starting Nmap 7.80 ( https://nmap.org )\nNmap scan report for example.com (192.168.1.1)\nHost is up (0.045s latency).\nNot shown: 995 closed ports\nPORT     STATE SERVICE\n22/tcp   open  ssh\n80/tcp   open  http\n443/tcp  open  https\n3306/tcp open  mysql';
+                        break;
+                    case 'sqlmap':
+                        output = '[*] starting @ null\n[null] [INFO] testing connection to the target URL\n[null] [INFO] testing if the target URL content is stable\n[null] [INFO] target URL content is stable';
+                        break;
+                    case 'help':
+                        output = 'Available commands: ls, cd, pwd, mkdir, touch, cat, rm, whoami, clear, help\nSecurity tools: nmap, sqlmap, nikto, metasploit, john, hashcat';
+                        break;
+                    case 'clear':
+                        outputElement.innerHTML = '';
+                        commandInput.value = '';
+                        return;
+                    default:
+                        output = `Command '${command}' not found. Type 'help' for available commands.`;
                 }
                 
                 outputElement.innerHTML += `${output}\n`;
@@ -593,6 +665,231 @@
                 
                 // Clear input
                 commandInput.value = '';
+            }
+            
+            // File system functions
+            function listFiles(args) {
+                let path = currentDir;
+                let showHidden = false;
+                let longFormat = false;
+                
+                // Parse arguments
+                for (const arg of args) {
+                    if (arg.startsWith('-')) {
+                        if (arg.includes('a')) showHidden = true;
+                        if (arg.includes('l')) longFormat = true;
+                    } else {
+                        path = resolvePath(arg);
+                    }
+                }
+                
+                const dir = getDirectory(path);
+                if (!dir) return `ls: cannot access '${path}': No such file or directory`;
+                
+                let files = Object.keys(dir.content);
+                if (!showHidden) {
+                    files = files.filter(file => !file.startsWith('.'));
+                }
+                
+                if (longFormat) {
+                    return files.map(file => {
+                        const isDir = dir.content[file].type === 'directory';
+                        return `${isDir ? 'd' : '-'}rwxr-xr-x 1 user user 4096 Jan 1 00:00 ${file}`;
+                    }).join('\n');
+                }
+                
+                return files.join('  ');
+            }
+            
+            function changeDirectory(args) {
+                if (args.length === 0) {
+                    currentDir = '/home/user';
+                    return '';
+                }
+                
+                const path = resolvePath(args[0]);
+                const dir = getDirectory(path);
+                
+                if (!dir || dir.type !== 'directory') {
+                    return `cd: no such directory: ${args[0]}`;
+                }
+                
+                currentDir = path;
+                return '';
+            }
+            
+            function makeDirectory(args) {
+                if (args.length === 0) {
+                    return 'mkdir: missing operand';
+                }
+                
+                for (const dirName of args) {
+                    const path = resolvePath(dirName);
+                    const parentDir = getDirectory(getParentPath(path));
+                    
+                    if (!parentDir) {
+                        return `mkdir: cannot create directory '${dirName}': No such file or directory`;
+                    }
+                    
+                    if (parentDir.content[getBaseName(path)]) {
+                        return `mkdir: cannot create directory '${dirName}': File exists`;
+                    }
+                    
+                    parentDir.content[getBaseName(path)] = {
+                        type: 'directory',
+                        content: {}
+                    };
+                }
+                
+                return '';
+            }
+            
+            function createFile(args) {
+                if (args.length === 0) {
+                    return 'touch: missing file operand';
+                }
+                
+                for (const fileName of args) {
+                    const path = resolvePath(fileName);
+                    const parentDir = getDirectory(getParentPath(path));
+                    
+                    if (!parentDir) {
+                        return `touch: cannot create file '${fileName}': No such file or directory`;
+                    }
+                    
+                    parentDir.content[getBaseName(path)] = {
+                        type: 'file',
+                        content: ''
+                    };
+                }
+                
+                return '';
+            }
+            
+            function readFile(args) {
+                if (args.length === 0) {
+                    return 'cat: missing file operand';
+                }
+                
+                const path = resolvePath(args[0]);
+                const file = getFile(path);
+                
+                if (!file) {
+                    return `cat: ${args[0]}: No such file or directory`;
+                }
+                
+                if (file.type !== 'file') {
+                    return `cat: ${args[0]}: Is a directory`;
+                }
+                
+                return file.content;
+            }
+            
+            function removeFile(args) {
+                if (args.length === 0) {
+                    return 'rm: missing operand';
+                }
+                
+                const recursive = args.includes('-r') || args.includes('-rf');
+                
+                for (const fileName of args) {
+                    if (fileName.startsWith('-')) continue;
+                    
+                    const path = resolvePath(fileName);
+                    const parentPath = getParentPath(path);
+                    const baseName = getBaseName(path);
+                    const parentDir = getDirectory(parentPath);
+                    
+                    if (!parentDir || !parentDir.content[baseName]) {
+                        return `rm: cannot remove '${fileName}': No such file or directory`;
+                    }
+                    
+                    const item = parentDir.content[baseName];
+                    if (item.type === 'directory' && Object.keys(item.content).length > 0 && !recursive) {
+                        return `rm: cannot remove '${fileName}': Directory not empty`;
+                    }
+                    
+                    delete parentDir.content[baseName];
+                }
+                
+                return '';
+            }
+            
+            // Helper functions for path resolution
+            function resolvePath(path) {
+                if (path.startsWith('/')) {
+                    return path;
+                }
+                
+                let result = currentDir;
+                if (path === '..') {
+                    const parts = result.split('/').filter(part => part !== '');
+                    if (parts.length > 1) {
+                        parts.pop();
+                        result = '/' + parts.join('/');
+                    } else {
+                        result = '/';
+                    }
+                } else if (path !== '.') {
+                    if (result === '/') {
+                        result = '/' + path;
+                    } else {
+                        result = result + '/' + path;
+                    // Normalize path (remove double slashes, etc.)
+                        result = result.replace(/\/+/g, '/');
+                    }
+                }
+                
+                return result;
+            }
+            
+            function getDirectory(path) {
+                const parts = path.split('/').filter(part => part !== '');
+                let current = fileSystem['/'];
+                
+                for (const part of parts) {
+                    if (!current.content || !current.content[part] || current.content[part].type !== 'directory') {
+                        return null;
+                    }
+                    current = current.content[part];
+                }
+                
+                return current;
+            }
+            
+            function getFile(path) {
+                const parts = path.split('/').filter(part => part !== '');
+                let current = fileSystem['/'];
+                
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    if (!current.content || !current.content[part]) {
+                        return null;
+                    }
+                    
+                    if (i === parts.length - 1) {
+                        return current.content[part];
+                    }
+                    
+                    if (current.content[part].type !== 'directory') {
+                        return null;
+                    }
+                    
+                    current = current.content[part];
+                }
+                
+                return null;
+            }
+            
+            function getParentPath(path) {
+                const parts = path.split('/').filter(part => part !== '');
+                parts.pop();
+                return '/' + parts.join('/');
+            }
+            
+            function getBaseName(path) {
+                const parts = path.split('/').filter(part => part !== '');
+                return parts[parts.length - 1];
             }
             
             // Update command history display
@@ -629,6 +926,19 @@
             document.querySelector('.terminal').addEventListener('click', () => {
                 commandInput.focus();
             });
+            
+            // Initialize file system
+            fileSystem['/'] = {
+                'type': 'directory',
+                'content': {
+                    'home': {
+                        'type': 'directory',
+                        'content': {
+                            'user': fileSystem['/home/user']
+                        }
+                    }
+                }
+            };
         });
     </script>
 </body>
