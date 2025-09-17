@@ -372,6 +372,42 @@
       promptEl.textContent = `user@web:${pathString(cwdPath)}$`;
     }
 
+    // TAB completion
+    function completeInput() {
+      let line = inputEl.value;
+      let parts = line.trim().split(/\s+/);
+      if (parts.length === 0) return;
+
+      // Completing the command
+      if (parts.length === 1) {
+        const matches = Object.keys(commandsMeta).filter(c => c.startsWith(parts[0]));
+        if (matches.length === 1) {
+          inputEl.value = matches[0] + " ";
+        } else if (matches.length > 1) {
+          print(matches.join("  "));
+        }
+      } else {
+        // Completing file/dir
+        let last = parts.pop();
+        let dirPath = ".";
+        if (last.includes("/")) {
+          dirPath = last.substring(0, last.lastIndexOf("/"));
+          last = last.substring(last.lastIndexOf("/") + 1);
+        }
+        const node = getNode(resolvePath(dirPath));
+        if (node && node.type === "dir") {
+          const matches = Object.keys(node.children).filter(name => name.startsWith(last));
+          if (matches.length === 1) {
+            const completion = matches[0];
+            const prefix = dirPath === "." ? "" : dirPath + "/";
+            inputEl.value = [...parts, prefix + completion].join(" ") + (node.children[completion].type==="dir" ? "/" : " ");
+          } else if (matches.length > 1) {
+            print(matches.join("  "));
+          }
+        }
+      }
+    }
+
     inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         runCommand(inputEl.value);
@@ -386,6 +422,9 @@
           histIndex = Math.min(history.length - 1, histIndex + 1);
           inputEl.value = history[histIndex] || "";
         }
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        completeInput();
       }
     });
 
