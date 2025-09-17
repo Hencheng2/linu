@@ -1,456 +1,512 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Linux Terminal Web Tool</title>
+  <meta charset="utf-8" />
+  <title>Linux Terminal Web Tool — Full</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      margin: 0;
-      font-family: monospace, monospace;
-      background-color: #111;
-      color: #eee;
-      display: flex;
-      height: 100vh;
+    :root{
+      --bg:#0b0b0b; --panel:#151515; --muted:#9aa0a6; --accent:#6cf; --prompt:#5fdc7c;
     }
-    aside {
-      width: 300px;
-      background: #1a1a1a;
-      border-right: 1px solid #333;
-      padding: 10px;
-      overflow-y: auto;
-    }
-    aside h2 { font-size: 16px; margin-top: 0; }
-    aside input {
-      width: 100%;
-      padding: 5px;
-      margin-bottom: 10px;
-      background: #222;
-      border: 1px solid #444;
-      color: #eee;
-    }
-    aside .cmd {
-      padding: 5px;
-      background: #222;
-      margin-bottom: 5px;
-      border-radius: 4px;
-      font-size: 12px;
-    }
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
-    header {
-      padding: 10px;
-      background: #1a1a1a;
-      border-bottom: 1px solid #333;
-      display: flex;
-      justify-content: space-between;
-    }
-    #output {
-      flex: 1;
-      padding: 10px;
-      background: #000;
-      overflow-y: auto;
-      white-space: pre-wrap;
-    }
-    #prompt-line {
-      display: flex;
-      align-items: center;
-      padding: 8px;
-      background: #111;
-    }
-    #prompt {
-      color: #0f0;
-      margin-right: 5px;
-    }
-    #input {
-      flex: 1;
-      padding: 5px;
-      background: #222;
-      border: none;
-      color: #fff;
-      outline: none;
-    }
-    #editorModal {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9);
-      display: none;
-      flex-direction: column;
-    }
-    #editorHeader {
-      background: #222;
-      padding: 5px;
-      font-size: 14px;
-      color: #0f0;
-    }
-    #editorArea {
-      flex: 1;
-      background: #000;
-      color: #fff;
-      padding: 10px;
-      border: none;
-      resize: none;
-      font-family: monospace;
-      font-size: 14px;
-      outline: none;
-      line-height: 1.4em;
-    }
-    #editorFooter {
-      background: #222;
-      padding: 5px;
-      font-size: 12px;
-      color: #ccc;
-    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;background:var(--bg);color:#e6eef8}
+    .app{display:flex;height:100vh}
+    aside{width:320px;background:var(--panel);border-right:1px solid rgba(255,255,255,0.03);padding:16px;overflow:auto}
+    aside h2{margin:0 0 8px 0;font-size:16px;color:#fff}
+    .filter{width:100%;padding:8px;border-radius:6px;background:#0f1113;border:1px solid rgba(255,255,255,0.03);color:var(--muted);margin-bottom:10px}
+    .cmd{background:#0d0f11;padding:8px;border-radius:6px;margin-bottom:8px;font-size:13px;color:var(--muted)}
+    .cmd b{color:#fff}
+    main{flex:1;display:flex;flex-direction:column}
+    header{padding:12px 16px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.02)}
+    .title{font-weight:600}
+    button{background:#111214;border:1px solid rgba(255,255,255,0.03);color:var(--muted);padding:8px 10px;border-radius:6px;cursor:pointer}
+    #output{flex:1;padding:14px;background:#000000aa;overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.4}
+    .prompt-line{display:flex;align-items:center;padding:12px;background:transparent;border-top:1px solid rgba(255,255,255,0.02)}
+    .prompt{color:var(--prompt);margin-right:8px;font-weight:600}
+    #input{flex:1;background:#0d0f11;border:1px solid rgba(255,255,255,0.03);padding:8px;border-radius:6px;color:#e6eef8;outline:none}
+    /* editor modal */
+    #editorModal{position:fixed;inset:0;display:none;flex-direction:column;background:linear-gradient(180deg,rgba(0,0,0,0.95),rgba(0,0,0,0.98));z-index:40}
+    #editorHeader{padding:10px;background:#0c0e10;color:var(--prompt);font-weight:600;border-bottom:1px solid rgba(255,255,255,0.03)}
+    #editorArea{flex:1;padding:12px;background:#000;border:none;color:#fff;font-family:inherit;font-size:14px;outline:none;resize:none}
+    #editorFooter{padding:8px;background:#0c0e10;color:var(--muted);font-size:13px;border-top:1px solid rgba(255,255,255,0.02)}
+    small.hint{display:block;color:var(--muted);margin-top:8px;font-size:12px}
+    .muted{color:var(--muted)}
   </style>
 </head>
 <body>
-  <aside>
-    <h2>Commands & Usage</h2>
-    <input type="text" id="filter" placeholder="Filter commands...">
-    <div id="commands-list"></div>
-    <p style="font-size:10px; color:#888;">
-      Runs in your browser only. Commands are simulated — no real shell access.
-    </p>
-  </aside>
-  <main>
-    <header>
-      <strong>Linux Terminal Emulator</strong>
-      <button id="clearBtn">Clear</button>
-    </header>
-    <div id="output"></div>
-    <div id="prompt-line">
-      <span id="prompt">user@web:~$</span>
-      <input id="input" autofocus autocomplete="off" placeholder="Type a command...">
-    </div>
-  </main>
+  <div class="app">
+    <aside>
+      <h2>Commands & Usage</h2>
+      <input id="filter" class="filter" placeholder="Filter commands..." />
+      <div id="commands-list"></div>
+      <small class="hint">Sandboxed in-browser emulator — no real shell access. Use <span class="muted">nano file.txt</span> to edit files. Ctrl+S to save, Ctrl+X to exit editor.</small>
+    </aside>
 
-  <!-- Nano-like Editor -->
-  <div id="editorModal">
-    <div id="editorHeader">Nano Editor — Press Ctrl+S to Save, Ctrl+X to Exit</div>
-    <textarea id="editorArea"></textarea>
-    <div id="editorFooter">^S Save   ^X Exit</div>
+    <main>
+      <header>
+        <div class="title">Linux Terminal Web Tool (simulated)</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="saveFsBtn">Save FS</button>
+          <button id="loadFsBtn">Load FS</button>
+          <button id="clearBtn">Clear</button>
+        </div>
+      </header>
+
+      <div id="output" aria-live="polite"></div>
+
+      <div class="prompt-line">
+        <div id="prompt" class="prompt">user@web:~$</div>
+        <input id="input" autocomplete="off" spellcheck="false" placeholder="Type a command — try 'help'" />
+      </div>
+    </main>
   </div>
 
-  <script>
-    const outputEl = document.getElementById("output");
-    const inputEl = document.getElementById("input");
-    const promptEl = document.getElementById("prompt");
-    const clearBtn = document.getElementById("clearBtn");
-    const filterEl = document.getElementById("filter");
-    const commandsListEl = document.getElementById("commands-list");
+  <!-- editor modal -->
+  <div id="editorModal">
+    <div id="editorHeader">Nano — Ctrl+S save · Ctrl+X exit</div>
+    <textarea id="editorArea" spellcheck="false"></textarea>
+    <div id="editorFooter">^S Save &nbsp;&nbsp; ^X Exit</div>
+  </div>
 
-    const commandsMeta = {
-      ls: "List directory contents",
-      pwd: "Print working directory",
-      cd: "Change directory",
-      cat: "Print file contents",
-      echo: "Display text (supports > and >> redirection)",
-      touch: "Create empty file",
-      mkdir: "Create directory",
-      rm: "Remove file or dir",
-      nano: "Open file in editor",
-      tree: "Display directory tree",
-      date: "Show date",
-      uname: "System info",
-      whoami: "Current user",
-      clear: "Clear the terminal",
-      help: "List available commands",
-      history: "Show command history",
-      man: "Manual page (simulated)",
-      grep: "Search text in input",
-      wc: "Count lines/words/chars"
-    };
+<script>
+/* ---------------------------------------------------------
+   In-browser Linux-ish terminal (simulated)
+   Features:
+   - virtual filesystem (root, /home/user)
+   - commands: many simulated commands (ls,cd,pwd,cat,echo,mkdir,touch,rm,cp,mv,chmod,head,tail,wc,grep,nano,tree,ps,top,uname,whoami,history,help,man,grep,wc,curl,wget,ping)
+   - piping (|), redirection (> and >>)
+   - tab completion (commands and file/dir names)
+   - nano-like editor (Ctrl+S, Ctrl+X)
+   - save/restore FS to localStorage
+---------------------------------------------------------*/
 
-    function refreshCommandsList(filter="") {
-      commandsListEl.innerHTML = "";
-      Object.entries(commandsMeta)
-        .filter(([k]) => k.includes(filter))
-        .forEach(([cmd, desc]) => {
-          const div = document.createElement("div");
-          div.className = "cmd";
-          div.textContent = `${cmd} — ${desc}`;
-          commandsListEl.appendChild(div);
-        });
-    }
-    refreshCommandsList();
-    filterEl.addEventListener("input", () => {
-      refreshCommandsList(filterEl.value);
+/* UI refs */
+const outputEl = document.getElementById('output');
+const inputEl = document.getElementById('input');
+const promptEl = document.getElementById('prompt');
+const commandsListEl = document.getElementById('commands-list');
+const filterEl = document.getElementById('filter');
+const editorModal = document.getElementById('editorModal');
+const editorArea = document.getElementById('editorArea');
+const saveFsBtn = document.getElementById('saveFsBtn');
+const loadFsBtn = document.getElementById('loadFsBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+/* Command metadata */
+const commandsMeta = {
+  ls:"List directory contents",
+  pwd:"Print working directory",
+  cd:"Change directory",
+  cat:"Print file contents",
+  echo:"Display text (supports > and >> redirection)",
+  touch:"Create empty file",
+  mkdir:"Create directory",
+  rm:"Remove file or dir",
+  cp:"Copy file",
+  mv:"Move/rename file",
+  chmod:"Change file permissions (simulated)",
+  nano:"Open file in editor",
+  tree:"Display directory tree",
+  head:"Show first lines of file",
+  tail:"Show last lines of file",
+  wc:"Count lines/words/chars (works with piping)",
+  grep:"Search text in input or file",
+  ps:"Show simulated process list",
+  top:"Show simulated processes (snapshot)",
+  uname:"System info",
+  whoami:"Current user",
+  clear:"Clear terminal",
+  help:"List commands",
+  history:"Show command history",
+  man:"Manual page (simulated)",
+  curl:"Simulated HTTP GET (no network)",
+  wget:"Simulated download (no network)",
+  ping:"Simulated ping"
+};
+
+/* render command panel */
+function refreshCommandsList(filter=''){
+  commandsListEl.innerHTML = '';
+  Object.entries(commandsMeta)
+    .filter(([k]) => k.includes(filter))
+    .forEach(([k,v])=>{
+      const el = document.createElement('div');
+      el.className = 'cmd';
+      el.innerHTML = `<b>${k}</b> — <span class="muted">${v}</span>`;
+      commandsListEl.appendChild(el);
     });
+}
+refreshCommandsList();
+filterEl.addEventListener('input',()=>refreshCommandsList(filterEl.value));
 
-    // Simulated filesystem
-    let fs = {
-      type: "dir",
-      name: "/",
-      children: {
-        home: {
-          type: "dir",
-          name: "home",
-          children: {
-            user: {
-              type: "dir",
-              name: "user",
-              children: {}
-            }
-          }
-        }
-      }
-    };
-    let cwdPath = ["/","home","user"];
+/* Virtual filesystem (simple object tree) */
+let fs = {
+  type:'dir', name:'/', children: {
+    home:{ type:'dir', name:'home', children:{
+      user:{ type:'dir', name:'user', children:{} }
+    }}
+  }
+};
+let cwdPath = ['/', 'home','user']; // array of path parts; root represented by ['/']
 
-    function getNode(pathArr) {
-      let node = fs;
-      for (let i=1;i<pathArr.length;i++) {
-        node = node.children[pathArr[i]];
-        if (!node) return null;
-      }
-      return node;
+/* helper utilities */
+function pathString(parts){
+  if(!parts || parts.length===0) return '/';
+  if(parts.length===1) return '/';
+  return parts.join('/').replace('//','/');
+}
+function getNode(parts){
+  if(!parts || parts.length===0) return null;
+  let node = fs;
+  for(let i=1;i<parts.length;i++){
+    if(!node.children || !Object.prototype.hasOwnProperty.call(node.children, parts[i])) return null;
+    node = node.children[parts[i]];
+  }
+  return node;
+}
+function ensureParent(parts){
+  const parent = getNode(parts.slice(0,-1));
+  return parent && parent.type==='dir' ? parent : null;
+}
+function resolvePath(input){
+  if(!input) return [...cwdPath];
+  // support ~ and absolute/relative
+  input = input.replace(/^~(?=$|\/)/, '/home/user');
+  let parts = input.startsWith('/') ? ['/'] : [...cwdPath];
+  input.split('/').filter(Boolean).forEach(p=>{
+    if(p==='.') return;
+    if(p==='..'){ if(parts.length>1) parts.pop(); return; }
+    parts.push(p);
+  });
+  return parts;
+}
+
+/* output helpers */
+let history = [];
+function print(text, type='out'){
+  if(text === '') return;
+  const div = document.createElement('div');
+  div.textContent = text;
+  div.style.color = type==='cmd' ? '#6cf' : '#cfe7d8';
+  outputEl.appendChild(div);
+  outputEl.scrollTop = outputEl.scrollHeight;
+}
+
+/* Editor (nano-like) */
+let editing = null; // {node, path}
+function openEditor(node, pathParts){
+  editing = {node, path: pathParts};
+  editorArea.value = node.content || '';
+  editorModal.style.display = 'flex';
+  editorArea.focus();
+}
+document.addEventListener('keydown', (e)=>{
+  if(editorModal.style.display === 'flex'){
+    if(e.ctrlKey && e.key.toLowerCase()==='s'){
+      e.preventDefault();
+      if(editing){ editing.node.content = editorArea.value; alert('Saved: '+pathString(editing.path)); }
+    } else if(e.ctrlKey && e.key.toLowerCase()==='x'){
+      e.preventDefault();
+      editorModal.style.display = 'none';
+      editing = null;
+      inputEl.focus();
     }
+  }
+});
 
-    function resolvePath(path) {
-      let parts = path.startsWith("/") ? ["/"] : [...cwdPath];
-      for (let p of path.split("/")) {
-        if (!p || p === ".") continue;
-        if (p === "..") {
-          if (parts.length > 1) parts.pop();
-        } else {
-          parts.push(p);
-        }
-      }
-      return parts;
-    }
-
-    function pathString(parts) {
-      return parts.length === 1 ? "/" : parts.join("/").replace("//","/");
-    }
-
-    let history = [];
-    let histIndex = null;
-
-    function print(text, type="out") {
-      const div = document.createElement("div");
-      div.textContent = text;
-      div.style.color = type === "cmd" ? "#6cf" : "#ccc";
-      outputEl.appendChild(div);
-      outputEl.scrollTop = outputEl.scrollHeight;
-    }
-
-    // Nano Editor
-    const editorModal = document.getElementById("editorModal");
-    const editorArea = document.getElementById("editorArea");
-    let editingFile = null;
-
-    function openEditor(fileNode, path) {
-      editorModal.style.display = "flex";
-      editorArea.value = fileNode.content || "";
-      editingFile = { node: fileNode, path };
-      editorArea.focus();
-    }
-
-    document.addEventListener("keydown", (e) => {
-      if (editorModal.style.display === "flex") {
-        if (e.ctrlKey && e.key.toLowerCase() === "s") {
-          e.preventDefault();
-          editingFile.node.content = editorArea.value;
-          alert("File saved: " + pathString(editingFile.path));
-        }
-        if (e.ctrlKey && e.key.toLowerCase() === "x") {
-          e.preventDefault();
-          editorModal.style.display = "none";
-          editingFile = null;
-          inputEl.focus();
-        }
-      }
+/* draw tree (for 'tree' command) */
+function drawTree(node, prefix=''){
+  let name = node.name + (node.type==='dir' ? '/' : '');
+  let out = name;
+  if(node.type==='dir'){
+    const keys = Object.keys(node.children);
+    keys.forEach((k, idx)=>{
+      const child = node.children[k];
+      const isLast = idx === keys.length - 1;
+      const connector = isLast ? '└── ' : '├── ';
+      const subprefix = prefix + (isLast ? '    ' : '│   ');
+      out += '\n' + prefix + connector + drawTree(child, subprefix);
     });
+  }
+  return out;
+}
 
-    function drawTree(node, prefix="") {
-      let res = node.name + (node.type==="dir" ? "/" : "");
-      if (node.type==="dir") {
-        const keys = Object.keys(node.children);
-        keys.forEach((k, idx) => {
-          const child = node.children[k];
-          const isLast = idx === keys.length - 1;
-          const connector = isLast ? "└── " : "├── ";
-          const subprefix = prefix + (isLast ? "    " : "│   ");
-          res += "\n" + prefix + connector + drawTree(child, subprefix);
-        });
-      }
-      return res;
+/* simulated processes for ps/top */
+function simulatedProcesses(){
+  return [
+    {PID:1, USER:'root', CPU:'0.0', MEM:'0.1', CMD:'init'},
+    {PID:102, USER:'user', CPU:'1.2', MEM:'0.5', CMD:'node'},
+    {PID:305, USER:'user', CPU:'0.3', MEM:'0.2', CMD:'web-term'}
+  ];
+}
+
+/* Command runner (single command) accepts optional inputText (for piping) */
+function runSingleCommand(segment, inputText=''){
+  const parts = segment.trim().split(/\s+/).filter(Boolean);
+  if(parts.length===0) return '';
+  const cmd = parts[0];
+  const args = parts.slice(1);
+  // basic flags parsing for head/tail - allow -n N as first arg
+  if(cmd==='pwd') return pathString(cwdPath);
+  if(cmd==='ls'){
+    const target = resolvePath(args[0]||'.');
+    const node = getNode(target);
+    if(!node || node.type!=='dir') return 'ls: No such directory';
+    return Object.keys(node.children).join('  ');
+  }
+  if(cmd==='cd'){
+    const target = resolvePath(args[0]||'/home/user');
+    const node = getNode(target);
+    if(node && node.type==='dir'){ cwdPath = target; return ''; }
+    return 'cd: No such directory';
+  }
+  if(cmd==='mkdir'){
+    if(!args[0]) return 'mkdir: missing operand';
+    const target = resolvePath(args[0]);
+    const parent = ensureParent(target);
+    if(!parent) return 'mkdir: cannot create directory';
+    parent.children[target.at(-1)] = {type:'dir', name: target.at(-1), children:{}};
+    return '';
+  }
+  if(cmd==='touch'){
+    if(!args[0]) return 'touch: missing operand';
+    const target = resolvePath(args[0]);
+    const parent = ensureParent(target);
+    if(!parent) return 'touch: cannot create file';
+    parent.children[target.at(-1)] = parent.children[target.at(-1)] || {type:'file',name:target.at(-1),content:''};
+    return '';
+  }
+  if(cmd==='cat'){
+    if(args.length===0){
+      // if inputText provided, print it
+      return inputText || 'cat: missing operand';
     }
+    const node = getNode(resolvePath(args[0]));
+    if(!node || node.type!=='file') return 'cat: No such file';
+    return node.content || '';
+  }
+  if(cmd==='echo'){
+    // keep join and remove wrapping quotes if present
+    const s = args.join(' ').replace(/^"(.*)"$/,'$1').replace(/^'(.*)'$/,'$1');
+    return s;
+  }
+  if(cmd==='rm'){
+    if(!args[0]) return 'rm: missing operand';
+    const target = resolvePath(args[0]);
+    const parent = ensureParent(target);
+    if(!parent || !parent.children[target.at(-1)]) return 'rm: No such file or directory';
+    delete parent.children[target.at(-1)];
+    return '';
+  }
+  if(cmd==='cp'){
+    if(args.length<2) return 'cp: missing operand';
+    const s = resolvePath(args[0]); const d = resolvePath(args[1]);
+    const snode = getNode(s);
+    const dparent = ensureParent(d);
+    if(!snode) return 'cp: source not found';
+    if(!dparent) return 'cp: destination invalid';
+    // deep clone
+    dparent.children[d.at(-1)] = JSON.parse(JSON.stringify(snode));
+    return '';
+  }
+  if(cmd==='mv'){
+    if(args.length<2) return 'mv: missing operand';
+    const s = resolvePath(args[0]); const d = resolvePath(args[1]);
+    const sparent = ensureParent(s);
+    const snode = sparent && sparent.children[s.at(-1)];
+    const dparent = ensureParent(d);
+    if(!snode) return 'mv: source not found';
+    if(!dparent) return 'mv: destination invalid';
+    dparent.children[d.at(-1)] = snode;
+    delete sparent.children[s.at(-1)];
+    return '';
+  }
+  if(cmd==='chmod'){
+    // simulated: store mode string
+    if(args.length<2) return 'chmod: missing operand';
+    const mode = args[0]; const target = resolvePath(args[1]);
+    const node = getNode(target);
+    if(!node) return 'chmod: No such file or directory';
+    node.mode = mode;
+    return '';
+  }
+  if(cmd==='nano'){
+    if(!args[0]) return 'nano: missing operand';
+    const target = resolvePath(args[0]);
+    const parent = ensureParent(target);
+    if(!parent) return 'nano: cannot open file';
+    if(!parent.children[target.at(-1)]) parent.children[target.at(-1)] = {type:'file',name:target.at(-1),content:''};
+    openEditor(parent.children[target.at(-1)], target);
+    return '';
+  }
+  if(cmd==='tree'){
+    const target = resolvePath(args[0]||'.');
+    const node = getNode(target);
+    if(!node) return 'tree: No such directory';
+    return drawTree(node);
+  }
+  if(cmd==='head' || cmd==='tail'){
+    if(!args[0]) return `${cmd}: missing operand`;
+    let n = 10;
+    // allow: head -n 5 file
+    if(args[0]==='-n' && args[1]){ n = Math.max(0, parseInt(args[1])||10); args.splice(0,2); }
+    const node = getNode(resolvePath(args[0]));
+    if(!node || node.type!=='file') return `${cmd}: No such file`;
+    const lines = (node.content||'').split('\n');
+    if(cmd==='head') return lines.slice(0,n).join('\n');
+    return lines.slice(-n).join('\n');
+  }
+  if(cmd==='wc'){
+    // wc supports inputText or file
+    let text = inputText;
+    if(args[0]){
+      const node = getNode(resolvePath(args[0]));
+      if(!node || node.type!=='file') return 'wc: No such file';
+      text = node.content || '';
+    }
+    const lines = text ? text.split('\n').length : 0;
+    const words = text ? (text.trim().split(/\s+/).filter(Boolean).length) : 0;
+    const chars = text ? text.length : 0;
+    return `${lines} ${words} ${chars}`;
+  }
+  if(cmd==='grep'){
+    // grep PATTERN (file?) or from inputText
+    if(!args[0]) return 'grep: missing pattern';
+    const pat = args[0];
+    if(args[1]){
+      const node = getNode(resolvePath(args[1]));
+      if(!node || node.type!=='file') return 'grep: No such file';
+      return (node.content||'').split('\n').filter(l=> l.includes(pat)).join('\n');
+    } else {
+      if(!inputText) return 'grep: no input';
+      return inputText.split('\n').filter(l=> l.includes(pat)).join('\n');
+    }
+  }
+  if(cmd==='ps'){
+    const rows = simulatedProcesses(); return rows.map(r=>`${r.PID} ${r.USER} ${r.CPU}% ${r.MEM}% ${r.CMD}`).join('\n');
+  }
+  if(cmd==='top'){
+    const rows = simulatedProcesses(); return 'PID USER %CPU %MEM CMD\n' + rows.map(r=>`${r.PID} ${r.USER} ${r.CPU} ${r.MEM} ${r.CMD}`).join('\n');
+  }
+  if(cmd==='uname') return 'Linux simulated 5.15.0-sim x86_64';
+  if(cmd==='whoami') return 'user';
+  if(cmd==='help') return Object.keys(commandsMeta).join('  ');
+  if(cmd==='history') return history.join('\n');
+  if(cmd==='clear'){ outputEl.innerHTML=''; return ''; }
+  if(cmd==='man') return args[0] && commandsMeta[args[0]] ? `${args[0]} — ${commandsMeta[args[0]]}\n(simulated man page)` : 'No manual entry';
+  if(cmd==='curl' || cmd==='wget' || cmd==='ping') return `(simulated) ${cmd}: network disabled in emulator`;
+  return `${cmd}: command not found`;
+}
 
-    function runSingleCommand(cmd, inputText="") {
-      const [command, ...args] = cmd.trim().split(/\s+/);
-      let res = "";
+/* High-level run: supports piping and redirection */
+function runCommand(line){
+  if(!line || !line.trim()) return;
+  history.push(line);
+  print(promptEl.textContent + ' ' + line, 'cmd');
 
-      switch(command) {
-        case "pwd": return pathString(cwdPath);
-        case "ls": {
-          const targetPath = resolvePath(args[0] || ".");
-          const node = getNode(targetPath);
-          return (!node || node.type !== "dir") ? "No such directory" : Object.keys(node.children).join("  ");
-        }
-        case "cd": {
-          const targetPath = resolvePath(args[0] || "/home/user");
-          const node = getNode(targetPath);
-          if (node && node.type === "dir") cwdPath = targetPath;
-          else return "No such directory";
-          return "";
-        }
-        case "mkdir": {
-          if (!args[0]) return "Missing operand";
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (parent && parent.type==="dir") {
-            parent.children[targetPath.at(-1)] = {type:"dir",name:targetPath.at(-1),children:{}};
-          } else return "Cannot create directory";
-          return "";
-        }
-        case "touch": {
-          if (!args[0]) return "Missing operand";
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (parent && parent.type==="dir") {
-            parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
-          } else return "Cannot create file";
-          return "";
-        }
-        case "cat": {
-          if (!args[0]) return "Missing operand";
-          const node = getNode(resolvePath(args[0]));
-          return (node && node.type==="file") ? node.content||"" : "No such file";
-        }
-        case "rm": {
-          if (!args[0]) return "Missing operand";
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (parent && parent.children[targetPath.at(-1)]) {
-            delete parent.children[targetPath.at(-1)];
-          } else return "No such file or directory";
-          return "";
-        }
-        case "nano": {
-          if (!args[0]) return "Missing operand";
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (!parent || parent.type!=="dir") return "Cannot open file";
-          if (!parent.children[targetPath.at(-1)]) {
-            parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
-          }
-          openEditor(parent.children[targetPath.at(-1)], targetPath);
-          return "";
-        }
-        case "tree": {
-          const targetPath = resolvePath(args[0] || ".");
-          const node = getNode(targetPath);
-          return node ? drawTree(node) : "No such directory";
-        }
-        case "date": return new Date().toString();
-        case "uname": return "Linux simulated 5.15.0 x86_64";
-        case "whoami": return "user";
-        case "help": return Object.keys(commandsMeta).join("  ");
-        case "history": return history.join("\n");
-        case "clear": outputEl.innerHTML = ""; return "";
-        case "man": return args[0] && commandsMeta[args[0]]
-            ? `${args[0]} — ${commandsMeta[args[0]]}\n(Simulated man page)`
-            : "No manual entry";
-        case "echo": return args.join(" ");
-        case "grep": {
-          if (!inputText) return "No input";
-          if (!args[0]) return "Missing pattern";
-          return inputText.split("\n").filter(line => line.includes(args[0])).join("\n");
-        }
-        case "wc": {
-          const text = inputText || "";
-          const lines = text.split("\n").length;
-          const words = text.trim().split(/\s+/).filter(Boolean).length;
-          const chars = text.length;
-          return `${lines} ${words} ${chars}`;
-        }
-        default:
-          return `${command}: command not found`;
+  // We will parse pipeline segments left-to-right, handling > >> on the last segment(s)
+  // split on | but not inside quotes (basic)
+  const segments = line.match(/(?:[^|"]+|"[^"]*")+/g).map(s=>s.trim());
+  let inputText = '';
+  let finalOutput = '';
+
+  for(let seg of segments){
+    // handle redirection operators in this segment
+    let redirectFile = null, append=false;
+    // handle >> first
+    if(seg.includes('>>')){
+      const parts = seg.split('>>').map(s=>s.trim());
+      seg = parts[0];
+      redirectFile = parts[1];
+      append = true;
+    } else if(seg.includes('>')){
+      const parts = seg.split('>').map(s=>s.trim());
+      seg = parts[0];
+      redirectFile = parts[1];
+      append = false;
+    }
+    // run this single command with inputText (piping)
+    const out = runSingleCommand(seg, inputText);
+    // If nano opened editor, it returns '', and editing occurs — treat as no text output
+    if(out === null || out === undefined) { inputText = ''; finalOutput = ''; continue; }
+    // perform redirection if requested
+    if(redirectFile){
+      const target = resolvePath(redirectFile);
+      const parent = ensureParent(target);
+      if(!parent || parent.type !== 'dir'){ print('Redirection failed: invalid target'); }
+      else {
+        if(!parent.children[target.at(-1)]) parent.children[target.at(-1)] = {type:'file',name:target.at(-1),content:''};
+        if(append) parent.children[target.at(-1)].content += out + '\n';
+        else parent.children[target.at(-1)].content = out + '\n';
+      }
+      finalOutput = '';
+      inputText = '';
+    } else {
+      finalOutput = out;
+      inputText = out;
+    }
+  }
+
+  if(finalOutput) print(finalOutput);
+  updatePrompt();
+}
+
+/* prompt update */
+function updatePrompt(){ promptEl.textContent = `user@web:${pathString(cwdPath)}$`; }
+
+/* Tab completion (simple) */
+function completeInput(){
+  const val = inputEl.value;
+  if(!val) return;
+  const parts = val.split(/\s+/);
+  if(parts.length===1){
+    const matches = Object.keys(commandsMeta).filter(c => c.startsWith(parts[0]));
+    if(matches.length===1) inputEl.value = matches[0] + ' ';
+    else if(matches.length>1) print(matches.join('  '));
+  } else {
+    // file completion for last token
+    const last = parts.pop();
+    const dir = last.includes('/') ? last.slice(0,last.lastIndexOf('/')) || '/' : '.';
+    const prefix = last.includes('/') ? last.slice(last.lastIndexOf('/')+1) : last;
+    const node = getNode(resolvePath(dir));
+    if(node && node.type==='dir'){
+      const matches = Object.keys(node.children).filter(n => n.startsWith(prefix));
+      if(matches.length===1){
+        const completed = (dir==='.' ? '' : dir + '/') + matches[0];
+        parts.push(completed + (node.children[matches[0]].type==='dir' ? '/' : ' '));
+        inputEl.value = parts.join(' ') + ' ';
+      } else if(matches.length>1){
+        print(matches.join('  '));
       }
     }
+  }
+}
 
-    function runCommand(line) {
-      if (!line.trim()) return;
-      history.push(line);
-      histIndex = null;
-      print(promptEl.textContent + " " + line, "cmd");
+/* Keyboard handling */
+inputEl.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ runCommand(inputEl.value); inputEl.value=''; }
+  else if(e.key==='Tab'){ e.preventDefault(); completeInput(); }
+  else if(e.key==='ArrowUp'){ if(history.length>0){ inputEl.value = history[history.length-1]; } }
+});
 
-      // Handle pipes
-      let parts = line.split("|").map(s => s.trim());
-      let input = "";
-      let output = "";
-      for (let i=0;i<parts.length;i++) {
-        let segment = parts[i];
+/* Save / load FS to localStorage */
+saveFsBtn.addEventListener('click', ()=>{
+  localStorage.setItem('webterm_fs', JSON.stringify(fs));
+  localStorage.setItem('webterm_cwd', JSON.stringify(cwdPath));
+  print('Filesystem saved to localStorage.');
+});
+loadFsBtn.addEventListener('click', ()=>{
+  const s = localStorage.getItem('webterm_fs');
+  const c = localStorage.getItem('webterm_cwd');
+  if(s){ fs = JSON.parse(s); cwdPath = c ? JSON.parse(c) : ['/', 'home','user']; updatePrompt(); print('Filesystem restored.'); }
+  else print('No saved filesystem found.');
+});
+clearBtn.addEventListener('click', ()=>{ outputEl.innerHTML=''; });
 
-        // Handle redirection > and >>
-        let redirectFile = null;
-        let append = false;
-        if (segment.includes(">>")) {
-          [segment, redirectFile] = segment.split(">>").map(s => s.trim());
-          append = true;
-        } else if (segment.includes(">")) {
-          [segment, redirectFile] = segment.split(">").map(s => s.trim());
-        }
-
-        output = runSingleCommand(segment, input);
-
-        // Handle redirection
-        if (redirectFile) {
-          const targetPath = resolvePath(redirectFile);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (parent && parent.type==="dir") {
-            if (!parent.children[targetPath.at(-1)]) {
-              parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
-            }
-            if (append) parent.children[targetPath.at(-1)].content += output + "\n";
-            else parent.children[targetPath.at(-1)].content = output + "\n";
-          } else {
-            print("Redirection failed: cannot write to file");
-          }
-          output = ""; // do not show on screen
-        }
-
-        input = output;
-      }
-
-      if (output) print(output);
-      promptEl.textContent = `user@web:${pathString(cwdPath)}$`;
-    }
-
-    inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        runCommand(inputEl.value);
-        inputEl.value = "";
-      } else if (e.key === "ArrowUp") {
-        if (history.length > 0) {
-          histIndex = histIndex === null ? history.length - 1 : Math.max(0, histIndex - 1);
-          inputEl.value = history[histIndex];
-        }
-      } else if (e.key === "ArrowDown") {
-        if (histIndex !== null) {
-          histIndex = Math.min(history.length - 1, histIndex + 1);
-          inputEl.value = history[histIndex] || "";
-        }
-      } else if (e.key === "Tab") {
-        e.preventDefault();
-        // simple autocomplete for commands
-        let val = inputEl.value;
-        let parts = val.split(/\s+/);
-        if (parts.length === 1) {
-          let matches = Object.keys(commandsMeta).filter(c => c.startsWith(parts[0]));
-          if (matches.length === 1) inputEl.value = matches[0] + " ";
-          else if (matches.length > 1) print(matches.join("  "));
-        }
-      }
-    });
-
-    clearBtn.addEventListener("click", () => {
-      outputEl.innerHTML = "";
-    });
-  </script>
+/* initialize */
+updatePrompt();
+print('In-browser Linux terminal — simulated. Type "help" for commands.');
+print('Tip: use Tab for completion, Ctrl+S/Ctrl+X inside editor.');
+</script>
 </body>
 </html>
