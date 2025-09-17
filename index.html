@@ -159,7 +159,9 @@
       clear: "Clear the terminal",
       help: "List available commands",
       history: "Show command history",
-      man: "Manual page (simulated)"
+      man: "Manual page (simulated)",
+      grep: "Search text in input",
+      wc: "Count lines/words/chars"
     };
 
     function refreshCommandsList(filter="") {
@@ -278,134 +280,145 @@
       return res;
     }
 
+    function runSingleCommand(cmd, inputText="") {
+      const [command, ...args] = cmd.trim().split(/\s+/);
+      let res = "";
+
+      switch(command) {
+        case "pwd": return pathString(cwdPath);
+        case "ls": {
+          const targetPath = resolvePath(args[0] || ".");
+          const node = getNode(targetPath);
+          return (!node || node.type !== "dir") ? "No such directory" : Object.keys(node.children).join("  ");
+        }
+        case "cd": {
+          const targetPath = resolvePath(args[0] || "/home/user");
+          const node = getNode(targetPath);
+          if (node && node.type === "dir") cwdPath = targetPath;
+          else return "No such directory";
+          return "";
+        }
+        case "mkdir": {
+          if (!args[0]) return "Missing operand";
+          const targetPath = resolvePath(args[0]);
+          const parent = getNode(targetPath.slice(0,-1));
+          if (parent && parent.type==="dir") {
+            parent.children[targetPath.at(-1)] = {type:"dir",name:targetPath.at(-1),children:{}};
+          } else return "Cannot create directory";
+          return "";
+        }
+        case "touch": {
+          if (!args[0]) return "Missing operand";
+          const targetPath = resolvePath(args[0]);
+          const parent = getNode(targetPath.slice(0,-1));
+          if (parent && parent.type==="dir") {
+            parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
+          } else return "Cannot create file";
+          return "";
+        }
+        case "cat": {
+          if (!args[0]) return "Missing operand";
+          const node = getNode(resolvePath(args[0]));
+          return (node && node.type==="file") ? node.content||"" : "No such file";
+        }
+        case "rm": {
+          if (!args[0]) return "Missing operand";
+          const targetPath = resolvePath(args[0]);
+          const parent = getNode(targetPath.slice(0,-1));
+          if (parent && parent.children[targetPath.at(-1)]) {
+            delete parent.children[targetPath.at(-1)];
+          } else return "No such file or directory";
+          return "";
+        }
+        case "nano": {
+          if (!args[0]) return "Missing operand";
+          const targetPath = resolvePath(args[0]);
+          const parent = getNode(targetPath.slice(0,-1));
+          if (!parent || parent.type!=="dir") return "Cannot open file";
+          if (!parent.children[targetPath.at(-1)]) {
+            parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
+          }
+          openEditor(parent.children[targetPath.at(-1)], targetPath);
+          return "";
+        }
+        case "tree": {
+          const targetPath = resolvePath(args[0] || ".");
+          const node = getNode(targetPath);
+          return node ? drawTree(node) : "No such directory";
+        }
+        case "date": return new Date().toString();
+        case "uname": return "Linux simulated 5.15.0 x86_64";
+        case "whoami": return "user";
+        case "help": return Object.keys(commandsMeta).join("  ");
+        case "history": return history.join("\n");
+        case "clear": outputEl.innerHTML = ""; return "";
+        case "man": return args[0] && commandsMeta[args[0]]
+            ? `${args[0]} — ${commandsMeta[args[0]]}\n(Simulated man page)`
+            : "No manual entry";
+        case "echo": return args.join(" ");
+        case "grep": {
+          if (!inputText) return "No input";
+          if (!args[0]) return "Missing pattern";
+          return inputText.split("\n").filter(line => line.includes(args[0])).join("\n");
+        }
+        case "wc": {
+          const text = inputText || "";
+          const lines = text.split("\n").length;
+          const words = text.trim().split(/\s+/).filter(Boolean).length;
+          const chars = text.length;
+          return `${lines} ${words} ${chars}`;
+        }
+        default:
+          return `${command}: command not found`;
+      }
+    }
+
     function runCommand(line) {
       if (!line.trim()) return;
       history.push(line);
       histIndex = null;
       print(promptEl.textContent + " " + line, "cmd");
 
-      const [cmd, ...args] = line.split(/\s+/);
-      let res = "";
+      // Handle pipes
+      let parts = line.split("|").map(s => s.trim());
+      let input = "";
+      let output = "";
+      for (let i=0;i<parts.length;i++) {
+        let segment = parts[i];
 
-      switch(cmd) {
-        case "pwd": res = pathString(cwdPath); break;
-        case "ls": {
-          const targetPath = resolvePath(args[0] || ".");
-          const node = getNode(targetPath);
-          res = (!node || node.type !== "dir") ? "No such directory" : Object.keys(node.children).join("  ");
-          break;
+        // Handle redirection > and >>
+        let redirectFile = null;
+        let append = false;
+        if (segment.includes(">>")) {
+          [segment, redirectFile] = segment.split(">>").map(s => s.trim());
+          append = true;
+        } else if (segment.includes(">")) {
+          [segment, redirectFile] = segment.split(">").map(s => s.trim());
         }
-        case "cd": {
-          const targetPath = resolvePath(args[0] || "/home/user");
-          const node = getNode(targetPath);
-          if (node && node.type === "dir") cwdPath = targetPath;
-          else res = "No such directory";
-          break;
-        }
-        case "mkdir": {
-          if (!args[0]) {res="Missing operand"; break;}
-          const targetPath = resolvePath(args[0]);
+
+        output = runSingleCommand(segment, input);
+
+        // Handle redirection
+        if (redirectFile) {
+          const targetPath = resolvePath(redirectFile);
           const parent = getNode(targetPath.slice(0,-1));
           if (parent && parent.type==="dir") {
-            parent.children[targetPath.at(-1)] = {type:"dir",name:targetPath.at(-1),children:{}};
-          } else res="Cannot create directory";
-          break;
-        }
-        case "touch": {
-          if (!args[0]) {res="Missing operand"; break;}
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (parent && parent.type==="dir") {
-            parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
-          } else res="Cannot create file";
-          break;
-        }
-        case "cat": {
-          if (!args[0]) {res="Missing operand"; break;}
-          const node = getNode(resolvePath(args[0]));
-          res = (node && node.type==="file") ? node.content||"" : "No such file";
-          break;
-        }
-        case "rm": {
-          if (!args[0]) {res="Missing operand"; break;}
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (parent && parent.children[targetPath.at(-1)]) {
-            delete parent.children[targetPath.at(-1)];
-          } else res="No such file or directory";
-          break;
-        }
-        case "nano": {
-          if (!args[0]) {res="Missing operand"; break;}
-          const targetPath = resolvePath(args[0]);
-          const parent = getNode(targetPath.slice(0,-1));
-          if (!parent || parent.type!=="dir") {res="Cannot open file"; break;}
-          if (!parent.children[targetPath.at(-1)]) {
-            parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
+            if (!parent.children[targetPath.at(-1)]) {
+              parent.children[targetPath.at(-1)] = {type:"file",name:targetPath.at(-1),content:""};
+            }
+            if (append) parent.children[targetPath.at(-1)].content += output + "\n";
+            else parent.children[targetPath.at(-1)].content = output + "\n";
+          } else {
+            print("Redirection failed: cannot write to file");
           }
-          const file = parent.children[targetPath.at(-1)];
-          openEditor(file, targetPath);
-          return;
+          output = ""; // do not show on screen
         }
-        case "tree": {
-          const targetPath = resolvePath(args[0] || ".");
-          const node = getNode(targetPath);
-          res = node ? drawTree(node) : "No such directory";
-          break;
-        }
-        case "date": res = new Date().toString(); break;
-        case "uname": res = "Linux simulated 5.15.0 x86_64"; break;
-        case "whoami": res = "user"; break;
-        case "help": res = Object.keys(commandsMeta).join("  "); break;
-        case "history": res = history.join("\n"); break;
-        case "clear": outputEl.innerHTML = ""; return;
-        case "man":
-          res = args[0] && commandsMeta[args[0]]
-            ? `${args[0]} — ${commandsMeta[args[0]]}\n(Simulated man page)`
-            : "No manual entry";
-          break;
-        default:
-          res = `${cmd}: command not found`;
+
+        input = output;
       }
 
-      if (res) print(res);
+      if (output) print(output);
       promptEl.textContent = `user@web:${pathString(cwdPath)}$`;
-    }
-
-    // TAB completion
-    function completeInput() {
-      let line = inputEl.value;
-      let parts = line.trim().split(/\s+/);
-      if (parts.length === 0) return;
-
-      // Completing the command
-      if (parts.length === 1) {
-        const matches = Object.keys(commandsMeta).filter(c => c.startsWith(parts[0]));
-        if (matches.length === 1) {
-          inputEl.value = matches[0] + " ";
-        } else if (matches.length > 1) {
-          print(matches.join("  "));
-        }
-      } else {
-        // Completing file/dir
-        let last = parts.pop();
-        let dirPath = ".";
-        if (last.includes("/")) {
-          dirPath = last.substring(0, last.lastIndexOf("/"));
-          last = last.substring(last.lastIndexOf("/") + 1);
-        }
-        const node = getNode(resolvePath(dirPath));
-        if (node && node.type === "dir") {
-          const matches = Object.keys(node.children).filter(name => name.startsWith(last));
-          if (matches.length === 1) {
-            const completion = matches[0];
-            const prefix = dirPath === "." ? "" : dirPath + "/";
-            inputEl.value = [...parts, prefix + completion].join(" ") + (node.children[completion].type==="dir" ? "/" : " ");
-          } else if (matches.length > 1) {
-            print(matches.join("  "));
-          }
-        }
-      }
     }
 
     inputEl.addEventListener("keydown", (e) => {
@@ -424,7 +437,14 @@
         }
       } else if (e.key === "Tab") {
         e.preventDefault();
-        completeInput();
+        // simple autocomplete for commands
+        let val = inputEl.value;
+        let parts = val.split(/\s+/);
+        if (parts.length === 1) {
+          let matches = Object.keys(commandsMeta).filter(c => c.startsWith(parts[0]));
+          if (matches.length === 1) inputEl.value = matches[0] + " ";
+          else if (matches.length > 1) print(matches.join("  "));
+        }
       }
     });
 
